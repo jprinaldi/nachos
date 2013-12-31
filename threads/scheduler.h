@@ -6,6 +6,8 @@
 // All rights reserved.  See copyright.h for copyright notice and limitation 
 // of liability and disclaimer of warranty provisions.
 
+#define MAX_PRIORITY 5
+
 #ifndef SCHEDULER_H
 #define SCHEDULER_H
 
@@ -27,9 +29,11 @@ class Scheduler {
 					// list, if any, and return thread.
     void Run(Thread* nextThread);	// Cause nextThread to start running
     void Print();			// Print contents of ready list
+
+    void Move(Thread* t, int p);
     
   private:
-    List<Thread*> *readyList;  		// queue of threads that are ready to run,
+    List<Thread*>* readyList[MAX_PRIORITY];  		// queue of threads that are ready to run,
 					// but not running
 };
 

@@ -29,7 +29,10 @@
 
 Scheduler::Scheduler()
 { 
-    readyList = new List<Thread*>; 
+    int i;
+    for(i=0; i<MAX_PRIORITY; i++) {
+        readyList[i] = new List<Thread*>;
+    }
 } 
 
 //----------------------------------------------------------------------
@@ -39,7 +42,10 @@ Scheduler::Scheduler()
 
 Scheduler::~Scheduler()
 { 
-    delete readyList; 
+    int i;
+    for(i=0; i<MAX_PRIORITY; i++) {
+        delete readyList[i];
+    }
 } 
 
 //----------------------------------------------------------------------
@@ -56,7 +62,8 @@ Scheduler::ReadyToRun (Thread *thread)
     DEBUG('t', "Putting thread %s on ready list.\n", thread->getName());
 
     thread->setStatus(READY);
-    readyList->Append(thread);
+    
+    readyList[thread->getPriority()]->Append(thread);
 }
 
 //----------------------------------------------------------------------
@@ -70,7 +77,12 @@ Scheduler::ReadyToRun (Thread *thread)
 Thread *
 Scheduler::FindNextToRun ()
 {
-    return readyList->Remove();
+    int i;
+    for (i=MAX_PRIORITY-1; i>=0; i--) {
+        if (!readyList[i]->IsEmpty()) {
+            return readyList[i]->Remove(); 
+        }
+    }
 }
 
 //----------------------------------------------------------------------
@@ -95,7 +107,7 @@ Scheduler::Run (Thread *nextThread)
 #ifdef USER_PROGRAM			// ignore until running user programs 
     if (currentThread->space != NULL) {	// if this thread is a user program,
         currentThread->SaveUserState(); // save the user's CPU registers
-	currentThread->space->SaveState();
+	   currentThread->space->SaveState();
     }
 #endif
     
@@ -123,13 +135,13 @@ Scheduler::Run (Thread *nextThread)
     // point, we were still running on the old thread's stack!
     if (threadToBeDestroyed != NULL) {
         delete threadToBeDestroyed;
-	threadToBeDestroyed = NULL;
+        threadToBeDestroyed = NULL;
     }
     
 #ifdef USER_PROGRAM
     if (currentThread->space != NULL) {		// if there is an address space
         currentThread->RestoreUserState();     // to restore, do it.
-	currentThread->space->RestoreState();
+        currentThread->space->RestoreState();
     }
 #endif
 }
@@ -148,6 +160,26 @@ ThreadPrint (Thread* t) {
 void
 Scheduler::Print()
 {
+    int i;
+    
     printf("Ready list contents:\n");
-    readyList->Apply(ThreadPrint);
+    
+    for (i=0; i<MAX_PRIORITY; i++) {
+        printf("Priority %d:", i);
+        readyList[i]->Apply(ThreadPrint);
+    }
+}
+
+void
+Scheduler::Move(Thread* t, int p)
+{
+    Thread* t2;
+    while (true) {
+        t2 = readyList[p]->Remove();
+        if(t2 == t) {
+            break;
+        }
+        readyList[p]->Append(t2);
+    }
+    readyList[t->getPriority()]->Prepend(t);
 }
