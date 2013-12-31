@@ -32,12 +32,17 @@ const unsigned STACK_FENCEPOST = 0xdeadbeef;
 //	"threadName" is an arbitrary string, useful for debugging.
 //----------------------------------------------------------------------
 
-Thread::Thread(const char* threadName)
+Thread::Thread(const char* threadName, bool joinable)
 {
     name = threadName;
     stackTop = NULL;
     stack = NULL;
     status = JUST_CREATED;
+    isJoinable = joinable;
+    joined = false;
+    priority = 0;
+    initialPriority = 0;
+    joinPort = new Port();
 #ifdef USER_PROGRAM
     space = NULL;
 #endif
@@ -61,7 +66,7 @@ Thread::~Thread()
 
     ASSERT(this != currentThread);
     if (stack != NULL)
-	DeallocBoundedArray((char *) stack, StackSize * sizeof(HostMemoryAddress));
+	   DeallocBoundedArray((char *) stack, StackSize * sizeof(HostMemoryAddress));
 }
 
 //----------------------------------------------------------------------
@@ -123,7 +128,7 @@ void
 Thread::CheckOverflow()
 {
     if (stack != NULL) {
-	ASSERT(*stack == STACK_FENCEPOST);
+	   ASSERT(*stack == STACK_FENCEPOST);
     }
 }
 
@@ -150,6 +155,10 @@ Thread::Finish ()
     ASSERT(this == currentThread);
     
     DEBUG('t', "Finishing thread \"%s\"\n", getName());
+
+    if (isJoinable && joined) {
+        joinPort->Send(0);
+    }
     
     threadToBeDestroyed = currentThread;
     Sleep();					// invokes SWITCH
@@ -186,8 +195,8 @@ Thread::Yield ()
     
     nextThread = scheduler->FindNextToRun();
     if (nextThread != NULL) {
-	scheduler->ReadyToRun(this);
-	scheduler->Run(nextThread);
+	   scheduler->ReadyToRun(this);
+	   scheduler->Run(nextThread);
     }
     interrupt->SetLevel(oldLevel);
 }
@@ -223,7 +232,7 @@ Thread::Sleep ()
 
     status = BLOCKED;
     while ((nextThread = scheduler->FindNextToRun()) == NULL) {
-	interrupt->Idle();	// no one to run, wait for an interrupt
+	   interrupt->Idle();	// no one to run, wait for an interrupt
     }
         
     scheduler->Run(nextThread); // returns when we've been signalled
@@ -307,6 +316,30 @@ void
 Thread::RestoreUserState()
 {
     for (int i = 0; i < NumTotalRegs; i++)
-	machine->WriteRegister(i, userRegisters[i]);
+	   machine->WriteRegister(i, userRegisters[i]);
 }
 #endif
+
+int Thread::Join() {
+    DEBUG('t', "Entered Join!\n");
+    joined = true;
+    int msg = joinPort->Receive();
+    DEBUG('t', "Joined finished!\n");
+    return msg;
+}
+
+int Thread::getPriority() {
+    return priority;
+}
+
+void Thread::setPriority(int newPriority) {
+    priority = newPriority;
+}
+
+int Thread::getInitialPriority() {
+    return initialPriority;
+}
+
+void Thread::setInitialPriority(int newPriority) {
+    initialPriority = newPriority;
+}

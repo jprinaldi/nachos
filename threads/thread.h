@@ -45,6 +45,8 @@
 #include "addrspace.h"
 #endif
 
+class Port;
+
 // CPU register state to be saved on context switch.  
 // x86 processors needs 9 32-bit registers, whereas x64 has 8 extra registers
 // We allocate room for the maximum of these two architectures
@@ -78,7 +80,7 @@ class Thread {
     HostMemoryAddress machineState[MachineStateSize];	// all registers except for stackTop
 
   public:
-    Thread(const char* debugName);	// initialize a Thread 
+    Thread(const char* debugName, bool joinable = false);	// initialize a Thread 
     ~Thread(); 				// deallocate a Thread
 					// NOTE -- thread being deleted
 					// must not be running when delete 
@@ -99,6 +101,13 @@ class Thread {
     const char* getName() { return (name); }
     void Print() { printf("%s, ", name); }
 
+    int Join();
+    
+    int getInitialPriority();
+    int getPriority();
+    void setInitialPriority(int newPriority);
+    void setPriority(int newPriority);
+
   private:
     // some of the private data for this class is listed above
     
@@ -111,6 +120,11 @@ class Thread {
     void StackAllocate(VoidFunctionPtr func, void* arg);
     					// Allocate a stack for thread.
 					// Used internally by Fork()
+    int priority;
+    int initialPriority;
+    Port* joinPort;
+    bool isJoinable; // true if the thread can join 
+    bool joined; // true if the thread joined
 
 #ifdef USER_PROGRAM
 // A thread running a user program actually has *two* sets of CPU registers -- 

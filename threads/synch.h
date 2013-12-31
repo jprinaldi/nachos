@@ -88,6 +88,9 @@ class Lock {
   private:
     const char* name;				// para depuraci�n
     // a�adir aqu� otros campos que sean necesarios
+    Thread* owner;
+    Semaphore* s;
+    Semaphore* aux;
 };
 
 //  La siguiente clase define una "variable condici�n". Una variable condici�n
@@ -123,6 +126,15 @@ class Lock {
 //  El estilo "Mesa" es algo m�s f�cil de implementar, pero no garantiza
 //  que el hilo despertado recupere de inmediato el control del cerrojo.
 
+class ConditionThread {
+public:
+    ConditionThread();
+    ~ConditionThread();
+    Semaphore* s;
+private:
+    Thread* t;
+};
+
 class Condition {
  public:
     // Constructor: se le indica cu�l es el cerrojo al que pertenece
@@ -137,13 +149,14 @@ class Condition {
     // El hilo que invoque a cualquiera de estas operaciones debe tener
     // adquirido el cerrojo correspondiente; de lo contrario se debe
     // producir un error.
-    void Wait(); 	
-    void Signal();   
-    void Broadcast();
+    void Wait(Lock* lock);  
+    void Signal(Lock* lock);   
+    void Broadcast(Lock* lock);
 
   private:
     const char* name;
     // aqu� se a�aden otros campos que sean necesarios
+    List<ConditionThread*> queue;
 };
 
 /*
@@ -171,5 +184,19 @@ class Condition {
 };
 
 */
+
+class Port {
+public:
+    Port();
+    ~Port();
+    void Send(int msg);
+    int Receive();
+private:
+    int buffer;
+    bool bufferEmpty;
+    Lock* lock;
+    Condition* sCondition;
+    Condition* rCondition;
+};
 
 #endif // SYNCH_H

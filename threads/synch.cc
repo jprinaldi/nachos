@@ -100,15 +100,143 @@ Semaphore::V()
 // Dummy functions -- so we can compile our later assignments 
 // Note -- without a correct implementation of Condition::Wait(), 
 // the test case in the network assignment won't work!
-Lock::Lock(const char* debugName) {}
-Lock::~Lock() {}
-void Lock::Acquire() {}
-void Lock::Release() {}
+Lock::Lock(const char* debugName)
+{
+    s = new Semaphore("lock semaphore", 1);
+    aux = new Semaphore("aux semaphore", 1);
+    owner = NULL;
+}
+
+Lock::~Lock()
+{
+    delete s;
+}
+
+void Lock::Acquire()
+{
+    int currentThreadPriority;
+    int ownerPriority;
+    
+    ASSERT(!isHeldByCurrentThread());
+    
+    aux->P();
+    
+    if(owner != NULL) {
+        currentThreadPriority = currentThread->getPriority();
+        ownerPriority = currentThread->getPriority();
+        if(ownerPriority < currentThreadPriority) {
+            owner->setPriority(currentThreadPriority);
+            scheduler->Move(owner, ownerPriority);
+        }
+    }
+    
+    aux->V();
+    
+    s->P();
+    owner = currentThread;
+}
+
+void Lock::Release()
+{
+    ASSERT(isHeldByCurrentThread());
+    
+    if(currentThread->getPriority() != currentThread->getInitialPriority()) {
+        currentThread->setPriority(currentThread->getInitialPriority());
+        scheduler->Move(currentThread, currentThread->getPriority());
+    }
+    
+    owner = NULL;
+    s->V();
+}
+
+bool Lock::isHeldByCurrentThread()
+{
+    return currentThread == owner;
+}
+
+ConditionThread::ConditionThread() {
+    t = currentThread;
+    s = new Semaphore("Condition Thread Semaphore",0);
+};
+
+ConditionThread::~ConditionThread() {
+    delete s;
+};
 
 Condition::Condition(const char* debugName, Lock* conditionLock) { }
 Condition::~Condition() { }
-void Condition::Wait() { ASSERT(false); }
-void Condition::Signal() { }
-void Condition::Broadcast() { }
 
+void Condition::Wait(Lock* lock)
+{
+    ConditionThread* ct = new ConditionThread();
+    queue.Append(ct);
+    lock->Release();
+    ct->s->P();
+    lock->Acquire();
+    delete ct;
+}
 
+void Condition::Signal(Lock* lock)
+{
+    if(!queue.IsEmpty()) {
+        ConditionThread* ct2 = queue.Remove();
+        ct2->s->V();
+    }
+}
+
+void Condition::Broadcast(Lock* lock)
+{
+    while(!queue.IsEmpty()) {
+        ConditionThread* ct2 = queue.Remove();
+        ct2->s->V();
+    }
+}
+
+Port::Port()
+{
+    lock = new Lock("PortLock");
+    sCondition = new Condition("SenderCondition",lock);
+    rCondition = new Condition("ReceiverCondition",lock);
+    bufferEmpty = true;
+}
+
+Port::~Port()
+{
+    delete lock;
+    delete sCondition;
+    delete rCondition;
+}
+
+void Port::Send(int msg)
+{
+    lock->Acquire();
+    
+    while(!bufferEmpty) {
+        sCondition->Wait(lock);
+    }
+    
+    buffer = msg;
+    bufferEmpty = false;
+    
+    rCondition->Signal(lock);
+    
+    lock->Release();
+    
+}
+
+int Port::Receive()
+{
+    lock->Acquire();
+    
+    while(bufferEmpty) {
+        rCondition->Wait(lock);
+    }
+    
+    int msg = buffer;
+    
+    bufferEmpty = true;
+    
+    lock->Release();
+    
+    return msg;
+}
