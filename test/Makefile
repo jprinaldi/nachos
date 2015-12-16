@@ -34,44 +34,17 @@ CPP = /lib/cpp
 INCDIR =-I../userprog -I../threads
 CFLAGS = -G 0 -c $(INCDIR) -mips1
 
-binaries = halt shell matmult sort
+binaries = halt shell matmult sort hello cat cp console1 console2 file touch
 
-all: halt shell matmult sort
+all: $(binaries)
 
 start.o: start.s ../userprog/syscall.h
 	$(CPP) $(CPPFLAGS) start.s > strt.s
 	$(AS) $(ASFLAGS) -o start.o strt.s
 	rm strt.s
 
-halt.o: halt.c
-	$(CC) $(CFLAGS) -c halt.c
-halt: halt.o start.o
-	$(LD) $(LDFLAGS) start.o halt.o -o halt.coff
-	../bin/coff2noff halt.coff halt
-
-shell.o: shell.c
-	$(CC) $(CFLAGS) -c shell.c
-shell: shell.o start.o
-	$(LD) $(LDFLAGS) start.o shell.o -o shell.coff
-	../bin/coff2noff shell.coff shell
-
-sort.o: sort.c
-	$(CC) $(CFLAGS) -c sort.c
-sort: sort.o start.o
-	$(LD) $(LDFLAGS) start.o sort.o -o sort.coff
-	../bin/coff2noff sort.coff sort
-
-matmult.o: matmult.c
-	$(CC) $(CFLAGS) -c matmult.c
-matmult: matmult.o start.o
-	$(LD) $(LDFLAGS) start.o matmult.o -o matmult.coff
-	../bin/coff2noff matmult.coff matmult
-
-
 # Estas reglas sirven para compilar programas simples,
-# que consistan en un �nico fuente.
-# Las reglas anteriores para construir los ejecutables
-# halt, shell, sort y matmult se podr�an suprimir
+# que consistan en un único fuente.
 
 %: %.c 
 	make start.o 
