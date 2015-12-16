@@ -32,8 +32,7 @@ const unsigned STACK_FENCEPOST = 0xdeadbeef;
 //	"threadName" is an arbitrary string, useful for debugging.
 //----------------------------------------------------------------------
 
-Thread::Thread(const char* threadName, bool joinable)
-{
+Thread::Thread(const char* threadName, bool joinable) {
     name = threadName;
     stackTop = NULL;
     stack = NULL;
@@ -43,6 +42,7 @@ Thread::Thread(const char* threadName, bool joinable)
     priority = 0;
     initialPriority = 0;
     joinPort = new Port();
+    exit_status = 0;
 #ifdef USER_PROGRAM
     space = NULL;
 #endif
@@ -60,8 +60,7 @@ Thread::Thread(const char* threadName, bool joinable)
 //      as part of starting up Nachos.
 //----------------------------------------------------------------------
 
-Thread::~Thread()
-{
+Thread::~Thread() {
     DEBUG('t', "Deleting thread \"%s\"\n", name);
 
     ASSERT(this != currentThread);
@@ -90,8 +89,7 @@ Thread::~Thread()
 //----------------------------------------------------------------------
 
 void 
-Thread::Fork(VoidFunctionPtr func, void* arg)
-{
+Thread::Fork(VoidFunctionPtr func, void* arg) {
 #ifdef HOST_x86_64
     DEBUG('t', "Forking thread \"%s\" with func = 0x%lx, arg = %ld\n",
 	  name, (HostMemoryAddress) func, arg);
@@ -125,8 +123,7 @@ Thread::Fork(VoidFunctionPtr func, void* arg)
 //----------------------------------------------------------------------
 
 void
-Thread::CheckOverflow()
-{
+Thread::CheckOverflow() {
     if (stack != NULL) {
 	   ASSERT(*stack == STACK_FENCEPOST);
     }
@@ -149,16 +146,23 @@ Thread::CheckOverflow()
 
 //
 void
-Thread::Finish ()
-{
+Thread::Finish() {
     interrupt->SetLevel(IntOff);		
     ASSERT(this == currentThread);
     
     DEBUG('t', "Finishing thread \"%s\"\n", getName());
+    DEBUG('t', "Thread exit status: %d\n", exit_status);
 
     if (isJoinable && joined) {
-        joinPort->Send(0);
+        joinPort->Send(exit_status);
     }
+    
+#ifdef USER_PROGRAM
+    SpaceId pid = process_table->GetPID(this);
+    process_table->RemoveProcess(pid);
+    user_program_args.erase(pid);
+    delete space;
+#endif
     
     threadToBeDestroyed = currentThread;
     Sleep();					// invokes SWITCH
@@ -184,8 +188,7 @@ Thread::Finish ()
 //----------------------------------------------------------------------
 
 void
-Thread::Yield ()
-{
+Thread::Yield () {
     Thread *nextThread;
     IntStatus oldLevel = interrupt->SetLevel(IntOff);
     
@@ -221,8 +224,7 @@ Thread::Yield ()
 //	off the ready list, and switching to it.
 //----------------------------------------------------------------------
 void
-Thread::Sleep ()
-{
+Thread::Sleep () {
     Thread *nextThread;
     
     ASSERT(this == currentThread);
@@ -262,8 +264,7 @@ static void InterruptEnable() { interrupt->Enable(); }
 //----------------------------------------------------------------------
 
 void
-Thread::StackAllocate (VoidFunctionPtr func, void* arg)
-{
+Thread::StackAllocate (VoidFunctionPtr func, void* arg) {
     stack = (HostMemoryAddress *) AllocBoundedArray(StackSize * sizeof(HostMemoryAddress));
 
     // i386 & MIPS & SPARC stack works from high addresses to low addresses
@@ -297,24 +298,22 @@ Thread::StackAllocate (VoidFunctionPtr func, void* arg)
 //----------------------------------------------------------------------
 
 void
-Thread::SaveUserState()
-{
+Thread::SaveUserState() {
     for (int i = 0; i < NumTotalRegs; i++)
 	userRegisters[i] = machine->ReadRegister(i);
 }
 
 //----------------------------------------------------------------------
 // Thread::RestoreUserState
-//	Restore the CPU state of a user program on a context switch.
+//  Restore the CPU state of a user program on a context switch.
 //
-//	Note that a user program thread has *two* sets of CPU registers -- 
-//	one for its state while executing user code, one for its state 
-//	while executing kernel code.  This routine restores the former.
+//  Note that a user program thread has *two* sets of CPU registers --
+//  one for its state while executing user code, one for its state
+//  while executing kernel code.  This routine restores the former.
 //----------------------------------------------------------------------
 
 void
-Thread::RestoreUserState()
-{
+Thread::RestoreUserState() {
     for (int i = 0; i < NumTotalRegs; i++)
 	   machine->WriteRegister(i, userRegisters[i]);
 }
@@ -343,3 +342,26 @@ int Thread::getInitialPriority() {
 void Thread::setInitialPriority(int newPriority) {
     initialPriority = newPriority;
 }
+
+#ifdef USER_PROGRAM
+
+int Thread::AddFile(OpenFile* open_file) {
+    // file_descriptor starts at 2 because 0 and 1 are reserved for console output and input
+    for (int file_descriptor = 2; file_descriptor < MAX_OPEN_FILES_TABLE_SIZE; file_descriptor++) {
+        if (open_files_table[file_descriptor] == NULL) {
+            open_files_table[file_descriptor] = open_file;
+            return file_descriptor;
+        }
+    }
+    return -1;
+}
+
+OpenFile* Thread::GetFile(int file_descriptor) {
+    return open_files_table[file_descriptor];
+}
+
+void Thread::RemoveFile(int file_descriptor) {
+    open_files_table[file_descriptor] = NULL;
+}
+
+#endif

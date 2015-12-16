@@ -29,6 +29,8 @@
 #define SC_Close	8
 #define SC_Fork		9
 #define SC_Yield	10
+#define SC_GetArgN  11
+#define SC_GetNArgs 12
 
 #ifndef IN_ASM
 
@@ -57,7 +59,7 @@ typedef int SpaceId;
 /* Run the executable, stored in the Nachos file "name", and return the 
  * address space identifier
  */
-SpaceId Exec(char *name);
+SpaceId Exec(char *name, char* argv);
  
 /* Only return once the the user program "id" has finished.  
  * Return the exit status.
@@ -123,6 +125,12 @@ void Fork(void (*func)());
  * or not. 
  */
 void Yield();		
+
+/* Get User Program Arguments */
+void GetArgN(int n, char* arg, int arg_len);
+
+/* Get number of arguments */
+void GetNArgs();
 
 #endif /* IN_ASM */
 

@@ -34,6 +34,10 @@ SynchDisk   *synchDisk;
 
 #ifdef USER_PROGRAM	// requires either FILESYS or FILESYS_STUB
 Machine *machine;	// user program memory and registers
+SynchConsole* synch_console;
+ProcessTable* process_table;
+BitMap* physical_pages_bit_map;
+std::map<SpaceId, std::vector<std::string> > user_program_args;
 #endif
 
 #ifdef NETWORK
@@ -155,7 +159,7 @@ Initialize(int argc, char **argv)
     stats = new Statistics();			// collect statistics
     interrupt = new Interrupt;			// start up interrupt handling
     scheduler = new Scheduler();		// initialize the ready queue
-    if (randomYield)				// start the timer (if needed)
+    //if (randomYield)				// start the timer (if needed)
 	timer = new Timer(TimerInterruptHandler, 0, randomYield);
 
     threadToBeDestroyed = NULL;
@@ -178,6 +182,9 @@ Initialize(int argc, char **argv)
     
 #ifdef USER_PROGRAM
     machine = new Machine(debugUserProg);	// this must come first
+    synch_console = new SynchConsole(NULL, NULL);
+    process_table = new ProcessTable();
+    physical_pages_bit_map = new BitMap(NumPhysPages);
 #endif
 
 #ifdef FILESYS
@@ -212,6 +219,9 @@ Cleanup()
     
 #ifdef USER_PROGRAM
     delete machine;
+    delete synch_console;
+    delete process_table;
+    delete physical_pages_bit_map;
 #endif
 
 #ifdef FILESYS_NEEDED

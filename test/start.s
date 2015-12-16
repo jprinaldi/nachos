@@ -130,6 +130,22 @@ Yield:
 	j	$31
 	.end Yield
 
+	.globl GetArgN
+	.ent	GetArgN
+GetArgN:
+	addiu $2,$0,SC_GetArgN
+	syscall
+	j	$31
+	.end GetArgN
+
+	.globl GetNArgs
+	.ent	GetNArgs
+GetNArgs:
+	addiu $2,$0,SC_GetNArgs
+	syscall
+	j	$31
+	.end GetNArgs
+
 /* dummy function to keep gcc happy */
         .globl  __main
         .ent    __main
