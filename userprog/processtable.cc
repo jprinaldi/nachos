@@ -9,7 +9,7 @@ ProcessTable::ProcessTable() {
 }
 
 ProcessTable::~ProcessTable() {
-    delete table;
+    delete[] table;
 }
 
 SpaceId ProcessTable::AddProcess(Thread* thread) {

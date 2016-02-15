@@ -143,7 +143,7 @@ void sc_read() {
 
     machine->WriteRegister(2, bytes_read);
     writeBuffToUsr(buffer, buffer_address, bytes_read);
-    delete buffer;
+    delete[] buffer;
 }
 
 void sc_write() {
@@ -174,7 +174,7 @@ void sc_open() {
     char* filename = new char[1024];
     readStrFromUsr(filename_address, filename);
     OpenFile* open_file = fileSystem->Open(filename);
-    delete filename;
+    delete[] filename;
     if (!open_file) {
         DEBUG('c', "Could not open file: %s\n", filename);
         machine->WriteRegister(2, -1);
@@ -200,8 +200,8 @@ void sc_join() {
     SpaceId pid = machine->ReadRegister(4);
     Thread* thread = process_table->GetProcess(pid);
     if (thread) {
-        thread->Join();
         machine->WriteRegister(2, thread->getExitStatus());
+        thread->Join();
     } else {
         DEBUG('c', "Could not find process with id %d\n", pid);
         machine->WriteRegister(2, -1);
@@ -222,7 +222,8 @@ void sc_exec() {
     if (file == NULL) {
         DEBUG('c', "Could not open file %s\n", filename);
         machine->WriteRegister(2, -1);
-        delete filename;
+        delete[] filename;
+        delete[] argv;
         return;
     }
 
@@ -230,7 +231,8 @@ void sc_exec() {
     if (thread == NULL) {
         DEBUG('c', "Could not create thread");
         machine->WriteRegister(2, -1);
-        delete filename;
+        delete[] filename;
+        delete[] argv;
         return;
     }
 
@@ -238,7 +240,8 @@ void sc_exec() {
     if (address_space == NULL) {
         DEBUG('c', "Could not create address space for file %s\n", filename);
         machine->WriteRegister(2, -1);
-        delete filename;
+        delete[] filename;
+        delete[] argv;
         return;
     }
 
@@ -262,7 +265,8 @@ void sc_exec() {
 
     thread->Fork(PrepareProcess, NULL);
 
-    delete filename;
+    delete[] filename;
+    delete[] argv;
 }
 
 void sc_get_arg_n() {

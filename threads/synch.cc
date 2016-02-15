@@ -110,6 +110,7 @@ Lock::Lock(const char* debugName)
 Lock::~Lock()
 {
     delete s;
+    delete aux;
 }
 
 void Lock::Acquire()

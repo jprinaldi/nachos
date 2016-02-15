@@ -361,6 +361,8 @@ OpenFile* Thread::GetFile(int file_descriptor) {
 }
 
 void Thread::RemoveFile(int file_descriptor) {
+    OpenFile* open_file = Thread::GetFile(file_descriptor);
+    delete open_file;
     open_files_table[file_descriptor] = NULL;
 }
 
