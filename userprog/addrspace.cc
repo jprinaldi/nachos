@@ -123,7 +123,7 @@ AddrSpace::~AddrSpace() {
     for (unsigned int i = 0; i < numPages; i++) {
         physical_pages_bit_map->Clear(pageTable[i].physicalPage);
     }
-    delete pageTable;
+    delete[] pageTable;
 }
 
 //----------------------------------------------------------------------
