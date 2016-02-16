@@ -42,10 +42,10 @@ extern Timer *timer;  // the hardware alarm clock
 #include "bitmap.h"
 
 extern Machine* machine;  // user program memory and registers
-extern SynchConsole* synch_console;
-extern ProcessTable* process_table;
-extern BitMap* physical_pages_bit_map;
-extern std::map<SpaceId, std::vector<std::string> > user_program_args;
+extern SynchConsole* synchConsole;
+extern ProcessTable* processTable;
+extern BitMap* freeList;
+extern std::map<SpaceId, std::vector<std::string> > userProgramArgs;
 #endif
 
 #ifdef FILESYS_NEEDED  // FILESYS or FILESYS_STUB

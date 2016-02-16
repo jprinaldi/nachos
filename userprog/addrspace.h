@@ -34,7 +34,7 @@ class AddrSpace {
     void SaveState();
     void RestoreState();
 
-    int VirtualToPhysical(int virtual_address);
+    int Translate(int virtualAddress);
 
  private:
     // Assume linear page table translation for now!

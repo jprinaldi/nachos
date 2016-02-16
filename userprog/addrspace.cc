@@ -84,7 +84,7 @@ AddrSpace::AddrSpace(OpenFile *executable) {
     pageTable = new TranslationEntry[numPages];
     for (i = 0; i < numPages; i++) {
         pageTable[i].virtualPage = i;
-        pageTable[i].physicalPage = physical_pages_bit_map->Find();
+        pageTable[i].physicalPage = freeList->Find();
         pageTable[i].valid = true;
         pageTable[i].use = false;
         pageTable[i].dirty = false;
@@ -102,14 +102,14 @@ AddrSpace::AddrSpace(OpenFile *executable) {
     if (noffH.code.size > 0) {
         DEBUG('a', "Initializing code segment, at 0x%x, size %d\n",
             noffH.code.virtualAddr, noffH.code.size);
-        executable->ReadAt(&(machine->mainMemory[VirtualToPhysical(noffH.code.virtualAddr)]),
+        executable->ReadAt(&(machine->mainMemory[Translate(noffH.code.virtualAddr)]),
             noffH.code.size, noffH.code.inFileAddr);
     }
 
     if (noffH.initData.size > 0) {
         DEBUG('a', "Initializing data segment, at 0x%x, size %d\n",
             noffH.initData.virtualAddr, noffH.initData.size);
-        executable->ReadAt(&(machine->mainMemory[VirtualToPhysical(noffH.initData.virtualAddr)]),
+        executable->ReadAt(&(machine->mainMemory[Translate(noffH.initData.virtualAddr)]),
             noffH.initData.size, noffH.initData.inFileAddr);
     }
 }
@@ -121,7 +121,7 @@ AddrSpace::AddrSpace(OpenFile *executable) {
 
 AddrSpace::~AddrSpace() {
     for (unsigned int i = 0; i < numPages; i++) {
-        physical_pages_bit_map->Clear(pageTable[i].physicalPage);
+        freeList->Clear(pageTable[i].physicalPage);
     }
     delete[] pageTable;
 }
@@ -181,8 +181,8 @@ void AddrSpace::RestoreState() {
     machine->pageTableSize = numPages;
 }
 
-int AddrSpace::VirtualToPhysical(int virtual_address) {
-    int virtual_page = virtual_address / PageSize;
-    int offset = virtual_address % PageSize;
-    return pageTable[virtual_page].physicalPage * PageSize + offset;
+int AddrSpace::Translate(int virtualAddress) {
+    int virtualPage = virtualAddress / PageSize;
+    int offset = virtualAddress % PageSize;
+    return pageTable[virtualPage].physicalPage * PageSize + offset;
 }

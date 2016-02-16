@@ -13,12 +13,12 @@ int main()
     }
     
     if (argc > 1) {
-        OpenFileId file_descriptor = Open(argv[1]);
-        if (file_descriptor != -1) {
-            while (Read(ch, 1, file_descriptor)) {
+        OpenFileId fileDescriptor = Open(argv[1]);
+        if (fileDescriptor != -1) {
+            while (Read(ch, 1, fileDescriptor)) {
                 Write(ch, 1, ConsoleOutput);
             }     
-            Close(file_descriptor);
+            Close(fileDescriptor);
         }
     }
     
