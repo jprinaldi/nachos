@@ -6,7 +6,7 @@
 
 class SynchConsole {
  public:
-    SynchConsole(const char* read_file, const char* write_file);
+    SynchConsole(const char* readFile, const char* writeFile);
     ~SynchConsole();
     char GetChar();
     void PutChar(char c);
@@ -15,8 +15,8 @@ class SynchConsole {
 
  private:
     Console* console;
-    Lock *read_lock, *write_lock;
-    Semaphore *read_semaphore, *write_semaphore;
+    Lock *readLock, *writeLock;
+    Semaphore *readSemaphore, *writeSemaphore;
 };
 
 #endif  // USERPROG_SYNCHCONSOLE_H_

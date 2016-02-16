@@ -19,7 +19,7 @@ SpaceId ProcessTable::AddProcess(Thread* thread) {
             return pid;
         }
     }
-    // process_table full
+    // processTable full
     return -1;
 }
 

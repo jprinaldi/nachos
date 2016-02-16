@@ -67,8 +67,8 @@ Semaphore::P()
     IntStatus oldLevel = interrupt->SetLevel(IntOff);	// disable interrupts
     
     while (value == 0) { 			// semaphore not available
-	queue->Append(currentThread);		// so go to sleep
-	currentThread->Sleep();
+	    queue->Append(currentThread);		// so go to sleep
+	    currentThread->Sleep();
     } 
     value--; 					// semaphore available, 
 						// consume its value
@@ -91,8 +91,9 @@ Semaphore::V()
     IntStatus oldLevel = interrupt->SetLevel(IntOff);
 
     thread = queue->Remove();
-    if (thread != NULL)	   // make thread ready, consuming the V immediately
-	scheduler->ReadyToRun(thread);
+    if (thread != NULL) {	   // make thread ready, consuming the V immediately
+	    scheduler->ReadyToRun(thread);
+    }
     value++;
     interrupt->SetLevel(oldLevel);
 }
@@ -122,10 +123,10 @@ void Lock::Acquire()
     
     aux->P();
     
-    if(owner != NULL) {
+    if (owner != NULL) {
         currentThreadPriority = currentThread->getPriority();
         ownerPriority = currentThread->getPriority();
-        if(ownerPriority < currentThreadPriority) {
+        if (ownerPriority < currentThreadPriority) {
             owner->setPriority(currentThreadPriority);
             scheduler->Move(owner, ownerPriority);
         }
@@ -141,7 +142,7 @@ void Lock::Release()
 {
     ASSERT(isHeldByCurrentThread());
     
-    if(currentThread->getPriority() != currentThread->getInitialPriority()) {
+    if (currentThread->getPriority() != currentThread->getInitialPriority()) {
         currentThread->setPriority(currentThread->getInitialPriority());
         scheduler->Move(currentThread, currentThread->getPriority());
     }
@@ -179,7 +180,7 @@ void Condition::Wait(Lock* lock)
 
 void Condition::Signal(Lock* lock)
 {
-    if(!queue.IsEmpty()) {
+    if (!queue.IsEmpty()) {
         ConditionThread* ct2 = queue.Remove();
         ct2->s->V();
     }
@@ -187,7 +188,7 @@ void Condition::Signal(Lock* lock)
 
 void Condition::Broadcast(Lock* lock)
 {
-    while(!queue.IsEmpty()) {
+    while (!queue.IsEmpty()) {
         ConditionThread* ct2 = queue.Remove();
         ct2->s->V();
     }
@@ -212,7 +213,7 @@ void Port::Send(int msg)
 {
     lock->Acquire();
     
-    while(!bufferEmpty) {
+    while (!bufferEmpty) {
         sCondition->Wait(lock);
     }
     
@@ -229,7 +230,7 @@ int Port::Receive()
 {
     lock->Acquire();
     
-    while(bufferEmpty) {
+    while (bufferEmpty) {
         rCondition->Wait(lock);
     }
     

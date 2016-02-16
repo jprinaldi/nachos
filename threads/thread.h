@@ -115,8 +115,8 @@ class Thread {
     void setInitialPriority(int newPriority);
     void setPriority(int newPriority);
 
-    void setExitStatus(int st) { exit_status = st; }
-    int getExitStatus() { return exit_status; }
+    void setExitStatus(int st) { exitStatus = st; }
+    int getExitStatus() { return exitStatus; }
 
  private:
     // some of the private data for this class is listed above
@@ -136,7 +136,7 @@ class Thread {
     bool isJoinable;  // true if the thread can join
     bool joined;  // true if the thread joined
 
-    int exit_status;
+    int exitStatus;
 
 #ifdef USER_PROGRAM
 // A thread running a user program actually has *two* sets of CPU registers --
@@ -145,7 +145,7 @@ class Thread {
 
     int userRegisters[NumTotalRegs];  // user-level CPU register state
 
-    std::map<int, OpenFile*> open_files_table;
+    std::map<int, OpenFile*> openFilesTable;
 
  public:
     void SaveUserState();  // save user-level register state
@@ -153,9 +153,9 @@ class Thread {
 
     AddrSpace *space;  // User code this thread is running.
 
-    int AddFile(OpenFile* open_file);
-    OpenFile* GetFile(int file_descriptor);
-    void RemoveFile(int file_descriptor);
+    int AddFile(OpenFile* openFile);
+    OpenFile* GetFile(int fileDescriptor);
+    void RemoveFile(int fileDescriptor);
 #endif
 };
 

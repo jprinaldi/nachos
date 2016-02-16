@@ -34,10 +34,10 @@ SynchDisk   *synchDisk;
 
 #ifdef USER_PROGRAM	// requires either FILESYS or FILESYS_STUB
 Machine *machine;	// user program memory and registers
-SynchConsole* synch_console;
-ProcessTable* process_table;
-BitMap* physical_pages_bit_map;
-std::map<SpaceId, std::vector<std::string> > user_program_args;
+SynchConsole* synchConsole;
+ProcessTable* processTable;
+BitMap* freeList; // Data structure used to keep track of free physical pages
+std::map<SpaceId, std::vector<std::string> > userProgramArgs;
 #endif
 
 #ifdef NETWORK
@@ -182,9 +182,9 @@ Initialize(int argc, char **argv)
     
 #ifdef USER_PROGRAM
     machine = new Machine(debugUserProg);	// this must come first
-    synch_console = new SynchConsole(NULL, NULL);
-    process_table = new ProcessTable();
-    physical_pages_bit_map = new BitMap(NumPhysPages);
+    synchConsole = new SynchConsole(NULL, NULL);
+    processTable = new ProcessTable();
+    freeList = new BitMap(NumPhysPages);
 #endif
 
 #ifdef FILESYS
@@ -219,9 +219,9 @@ Cleanup()
     
 #ifdef USER_PROGRAM
     delete machine;
-    delete synch_console;
-    delete process_table;
-    delete physical_pages_bit_map;
+    delete synchConsole;
+    delete processTable;
+    delete freeList;
 #endif
 
 #ifdef FILESYS_NEEDED

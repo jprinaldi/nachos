@@ -42,7 +42,7 @@ Thread::Thread(const char* threadName, bool joinable) {
     priority = 0;
     initialPriority = 0;
     joinPort = new Port();
-    exit_status = 0;
+    exitStatus = 0;
 #ifdef USER_PROGRAM
     space = NULL;
 #endif
@@ -151,16 +151,16 @@ Thread::Finish() {
     ASSERT(this == currentThread);
     
     DEBUG('t', "Finishing thread \"%s\"\n", getName());
-    DEBUG('t', "Thread exit status: %d\n", exit_status);
+    DEBUG('t', "Thread exit status: %d\n", exitStatus);
 
     if (isJoinable && joined) {
-        joinPort->Send(exit_status);
+        joinPort->Send(exitStatus);
     }
     
 #ifdef USER_PROGRAM
-    SpaceId pid = process_table->GetPID(this);
-    process_table->RemoveProcess(pid);
-    user_program_args.erase(pid);
+    SpaceId pid = processTable->GetPID(this);
+    processTable->RemoveProcess(pid);
+    userProgramArgs.erase(pid);
     delete space;
 #endif
     
@@ -345,25 +345,25 @@ void Thread::setInitialPriority(int newPriority) {
 
 #ifdef USER_PROGRAM
 
-int Thread::AddFile(OpenFile* open_file) {
-    // file_descriptor starts at 2 because 0 and 1 are reserved for console output and input
-    for (int file_descriptor = 2; file_descriptor < MAX_OPEN_FILES_TABLE_SIZE; file_descriptor++) {
-        if (open_files_table[file_descriptor] == NULL) {
-            open_files_table[file_descriptor] = open_file;
-            return file_descriptor;
+int Thread::AddFile(OpenFile* openFile) {
+    // fileDescriptor starts at 2 because 0 and 1 are reserved for console output and input
+    for (int fileDescriptor = 2; fileDescriptor < MAX_OPEN_FILES_TABLE_SIZE; fileDescriptor++) {
+        if (openFilesTable[fileDescriptor] == NULL) {
+            openFilesTable[fileDescriptor] = openFile;
+            return fileDescriptor;
         }
     }
     return -1;
 }
 
-OpenFile* Thread::GetFile(int file_descriptor) {
-    return open_files_table[file_descriptor];
+OpenFile* Thread::GetFile(int fileDescriptor) {
+    return openFilesTable[fileDescriptor];
 }
 
-void Thread::RemoveFile(int file_descriptor) {
-    OpenFile* open_file = Thread::GetFile(file_descriptor);
-    delete open_file;
-    open_files_table[file_descriptor] = NULL;
+void Thread::RemoveFile(int fileDescriptor) {
+    OpenFile* openFile = Thread::GetFile(fileDescriptor);
+    delete openFile;
+    openFilesTable[fileDescriptor] = NULL;
 }
 
 #endif

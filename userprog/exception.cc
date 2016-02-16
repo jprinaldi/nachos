@@ -25,49 +25,49 @@
 #include "system.h"
 #include "syscall.h"
 
-void readStrFromUsr(int user_address, char *out_string) {
+void readStrFromUsr(int userAddress, char *outString) {
     int value;
     int i = 0;
 
     do {
-        machine->ReadMem(user_address + i, 1, &value);
-        out_string[i++] = value;
+        machine->ReadMem(userAddress + i, 1, &value);
+        outString[i++] = value;
     } while (value);
 }
 
-void readBuffFromUsr(int user_address, char *out_buffer, int byte_count) {
+void readBuffFromUsr(int userAddress, char *outBuffer, int byteCount) {
     int value;
 
-    for (int i = 0; i < byte_count; i++) {
-        machine->ReadMem(user_address + i, 1, &value);
-        out_buffer[i] = value;
+    for (int i = 0; i < byteCount; i++) {
+        machine->ReadMem(userAddress + i, 1, &value);
+        outBuffer[i] = value;
     }
 
-    out_buffer[byte_count] = 0;
+    outBuffer[byteCount] = 0;
 }
 
-void writeStrToUsr(char *str, int user_address) {
+void writeStrToUsr(char *str, int userAddress) {
     int i = 0;
 
     do {
-        machine->WriteMem(user_address + i, 1, str[i]);
+        machine->WriteMem(userAddress + i, 1, str[i]);
     } while (str[i++]);
 }
 
-void writeBuffToUsr(char *str, int user_address, int byte_count) {
-    for (int i = 0; i < byte_count; i++) {
-        machine->WriteMem(user_address + i, 1, str[i]);
+void writeBuffToUsr(char *str, int userAddress, int byteCount) {
+    for (int i = 0; i < byteCount; i++) {
+        machine->WriteMem(userAddress + i, 1, str[i]);
     }
 
-    machine->WriteMem(user_address + byte_count, 1, 0);
+    machine->WriteMem(userAddress + byteCount, 1, 0);
 }
 
 void IncrementProgramCounter() {
-    int program_counter = machine->ReadRegister(PCReg);
-    machine->WriteRegister(PrevPCReg, program_counter);
-    program_counter = machine->ReadRegister(NextPCReg);
-    machine->WriteRegister(PCReg, program_counter);
-    machine->WriteRegister(NextPCReg, program_counter + 4);
+    int programCounter = machine->ReadRegister(PCReg);
+    machine->WriteRegister(PrevPCReg, programCounter);
+    programCounter = machine->ReadRegister(NextPCReg);
+    machine->WriteRegister(PCReg, programCounter);
+    machine->WriteRegister(NextPCReg, programCounter + 4);
 }
 
 void PrepareProcess(void* arg) {
@@ -99,12 +99,12 @@ void PrepareProcess(void* arg) {
 //  are in machine.h.
 //----------------------------------------------------------------------
 
-void sc_halt() {
+void Halt() {
     DEBUG('a', "Shutdown, initiated by user program.\n");
     interrupt->Halt();
 }
 
-void sc_create() {
+void Create() {
     int filenameAddr = machine->ReadRegister(4);
     int fileSize = 0;
     char* filename = new char[255];
@@ -119,86 +119,86 @@ void sc_create() {
     delete filename;
 }
 
-void sc_read() {
-    int buffer_address = machine->ReadRegister(4);
+void Read() {
+    int bufferAddress = machine->ReadRegister(4);
     int size = machine->ReadRegister(5);
-    OpenFileId file_descriptor = machine->ReadRegister(6);
+    OpenFileId fileDescriptor = machine->ReadRegister(6);
     char* buffer = new char[255];
-    int bytes_read;
+    int bytesReadCount;
 
-    switch (file_descriptor) {
+    switch (fileDescriptor) {
         case ConsoleOutput:
-            bytes_read = -1;  // error
+            bytesReadCount = -1;  // error
             break;
         case ConsoleInput:
-            for (bytes_read = 0; bytes_read < size; bytes_read++) {
-                buffer[bytes_read] = synch_console->GetChar();
+            for (bytesReadCount = 0; bytesReadCount < size; bytesReadCount++) {
+                buffer[bytesReadCount] = synchConsole->GetChar();
             }
             break;
         default:
-            OpenFile* open_file = currentThread->GetFile(file_descriptor);
-            bytes_read = open_file->Read(buffer, size);
+            OpenFile* openFile = currentThread->GetFile(fileDescriptor);
+            bytesReadCount = openFile->Read(buffer, size);
             break;
     }
 
-    machine->WriteRegister(2, bytes_read);
-    writeBuffToUsr(buffer, buffer_address, bytes_read);
+    machine->WriteRegister(2, bytesReadCount);
+    writeBuffToUsr(buffer, bufferAddress, bytesReadCount);
     delete[] buffer;
 }
 
-void sc_write() {
-    int buffer_address = machine->ReadRegister(4);
+void Write() {
+    int bufferAddress = machine->ReadRegister(4);
     int size = machine->ReadRegister(5);
-    OpenFileId file_descriptor = machine->ReadRegister(6);
+    OpenFileId fileDescriptor = machine->ReadRegister(6);
     char buffer[1024];
 
-    readBuffFromUsr(buffer_address, buffer, size);
+    readBuffFromUsr(bufferAddress, buffer, size);
 
-    switch (file_descriptor) {
+    switch (fileDescriptor) {
         case ConsoleInput:
             break;
         case ConsoleOutput:
             for (int i = 0; i < size; i++) {
-                synch_console->PutChar(buffer[i]);
+                synchConsole->PutChar(buffer[i]);
             }
             break;
         default:
-            OpenFile* open_file = currentThread->GetFile(file_descriptor);
-            open_file->Write(buffer, size);
+            OpenFile* openFile = currentThread->GetFile(fileDescriptor);
+            openFile->Write(buffer, size);
             break;
     }
 }
 
-void sc_open() {
-    int filename_address = machine->ReadRegister(4);
+void Open() {
+    int filenameAddress = machine->ReadRegister(4);
     char* filename = new char[1024];
-    readStrFromUsr(filename_address, filename);
-    OpenFile* open_file = fileSystem->Open(filename);
+    readStrFromUsr(filenameAddress, filename);
+    OpenFile* openFile = fileSystem->Open(filename);
     delete[] filename;
-    if (!open_file) {
+    if (!openFile) {
         DEBUG('c', "Could not open file: %s\n", filename);
         machine->WriteRegister(2, -1);
     } else {
-        OpenFileId file_descriptor = currentThread->AddFile(open_file);
-        machine->WriteRegister(2, file_descriptor);
-        DEBUG('c', "Opened file: %d\n", file_descriptor);
+        OpenFileId fileDescriptor = currentThread->AddFile(openFile);
+        machine->WriteRegister(2, fileDescriptor);
+        DEBUG('c', "Opened file: %d\n", fileDescriptor);
     }
 }
 
-void sc_close() {
-    OpenFileId file_descriptor = machine->ReadRegister(4);
-    currentThread->RemoveFile(file_descriptor);
+void Close() {
+    OpenFileId fileDescriptor = machine->ReadRegister(4);
+    currentThread->RemoveFile(fileDescriptor);
 }
 
-void sc_exit() {
-    int exit_status = machine->ReadRegister(4);
-    currentThread->setExitStatus(exit_status);
+void Exit() {
+    int exitStatus = machine->ReadRegister(4);
+    currentThread->setExitStatus(exitStatus);
     currentThread->Finish();
 }
 
-void sc_join() {
+void Join() {
     SpaceId pid = machine->ReadRegister(4);
-    Thread* thread = process_table->GetProcess(pid);
+    Thread* thread = processTable->GetProcess(pid);
     if (thread) {
         machine->WriteRegister(2, thread->getExitStatus());
         thread->Join();
@@ -208,13 +208,13 @@ void sc_join() {
     }
 }
 
-void sc_exec() {
-    int filename_address = machine->ReadRegister(4);
-    int argv_address = machine->ReadRegister(5);
+void Exec() {
+    int filenameAddress = machine->ReadRegister(4);
+    int argvAddress = machine->ReadRegister(5);
     char* filename = new char[255];  // size?
     char* argv = new char[255];
-    readStrFromUsr(filename_address, filename);
-    readStrFromUsr(argv_address, argv);
+    readStrFromUsr(filenameAddress, filename);
+    readStrFromUsr(argvAddress, argv);
 
     char arg[255];
 
@@ -236,8 +236,8 @@ void sc_exec() {
         return;
     }
 
-    AddrSpace* address_space = new AddrSpace(file);
-    if (address_space == NULL) {
+    AddrSpace* addressSpace = new AddrSpace(file);
+    if (addressSpace == NULL) {
         DEBUG('c', "Could not create address space for file %s\n", filename);
         machine->WriteRegister(2, -1);
         delete[] filename;
@@ -245,17 +245,17 @@ void sc_exec() {
         return;
     }
 
-    thread->space = address_space;
+    thread->space = addressSpace;
 
-    SpaceId pid = process_table->AddProcess(thread);
-    // check if process could not be added
+    SpaceId pid = processTable->AddProcess(thread);
+    // TODO: check if process could not be added
 
     int i = 0, k = 0;
     do {
         if (argv[i] == ' ' || argv[i] == '\0') {
             arg[k] = '\0';
             k = 0;
-            user_program_args[pid].push_back(arg);
+            userProgramArgs[pid].push_back(arg);
         } else {
             arg[k++] = argv[i];
         }
@@ -269,21 +269,21 @@ void sc_exec() {
     delete[] argv;
 }
 
-void sc_get_arg_n() {
-    int arg_index = machine->ReadRegister(4);
-    int arg_address = machine->ReadRegister(5);
-    int arg_len_address = machine->ReadRegister(6);
-    SpaceId pid = process_table->GetPID(currentThread);
-    char* arg = (char*)user_program_args[pid].at(arg_index).c_str();
-    writeStrToUsr(arg, arg_address);
-    machine->WriteMem(arg_len_address, 4, strlen(arg));
+void GetArgN() {
+    int argIndex = machine->ReadRegister(4);
+    int argAddress = machine->ReadRegister(5);
+    int argLenAddress = machine->ReadRegister(6);
+    SpaceId pid = processTable->GetPID(currentThread);
+    char* arg = (char*)userProgramArgs[pid].at(argIndex).c_str();
+    writeStrToUsr(arg, argAddress);
+    machine->WriteMem(argLenAddress, 4, strlen(arg));
 }
 
-void sc_get_n_args() {
-    int n_address = machine->ReadRegister(4);
-    SpaceId pid = process_table->GetPID(currentThread);
-    std::vector<std::string> args = user_program_args[pid];
-    machine->WriteMem(n_address, 4, args.size());
+void GetNArgs() {
+    int nAddress = machine->ReadRegister(4);
+    SpaceId pid = processTable->GetPID(currentThread);
+    std::vector<std::string> args = userProgramArgs[pid];
+    machine->WriteMem(nAddress, 4, args.size());
 }
 
 void
@@ -293,37 +293,37 @@ ExceptionHandler(ExceptionType which) {
     if (which == SyscallException) {
         switch (type) {
             case SC_Halt:
-                sc_halt();
+                Halt();
                 break;
             case SC_Create:
-                sc_create();
+                Create();
                 break;
             case SC_Read:
-                sc_read();
+                Read();
                 break;
             case SC_Write:
-                sc_write();
+                Write();
                 break;
             case SC_Open:
-                sc_open();
+                Open();
                 break;
             case SC_Close:
-                sc_close();
+                Close();
                 break;
             case SC_Exit:
-                sc_exit();
+                Exit();
                 break;
             case SC_Join:
-                sc_join();
+                Join();
                 break;
             case SC_Exec:
-                sc_exec();
+                Exec();
                 break;
             case SC_GetArgN:
-                sc_get_arg_n();
+                GetArgN();
                 break;
             case SC_GetNArgs:
-                sc_get_n_args();
+                GetNArgs();
                 break;
             default:
                 printf("Unexpected user mode exception %d %d\n", which, type);
