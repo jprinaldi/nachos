@@ -35,6 +35,8 @@ class AddrSpace {
     void RestoreState();
 
     int Translate(int virtualAddress);
+    
+    TranslationEntry* GetPage(int virtualPageNumber);
 
  private:
     // Assume linear page table translation for now!

@@ -66,6 +66,10 @@ Thread::~Thread() {
     ASSERT(this != currentThread);
     if (stack != NULL)
 	   DeallocBoundedArray((char *) stack, StackSize * sizeof(HostMemoryAddress));
+
+    #ifdef USER_PROGRAM
+        delete space;
+    #endif
 }
 
 //----------------------------------------------------------------------
@@ -161,7 +165,6 @@ Thread::Finish() {
     SpaceId pid = processTable->GetPID(this);
     processTable->RemoveProcess(pid);
     userProgramArgs.erase(pid);
-    delete space;
 #endif
     
     threadToBeDestroyed = currentThread;
