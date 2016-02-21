@@ -75,7 +75,7 @@ AddrSpace::AddrSpace(OpenFile *executable) {
 
     // check we're not trying to run anything too big --
     // at least until we have virtual memory
-    ASSERT(numPages <= NumPhysPages);
+    // ASSERT(numPages <= NumPhysPages);
 
     DEBUG('a', "Initializing address space, num pages %d, size %d\n",
         numPages, size);
@@ -166,6 +166,13 @@ AddrSpace::InitRegisters() {
 //----------------------------------------------------------------------
 
 void AddrSpace::SaveState() {
+    #ifdef USE_TLB
+    for (int i = 0; i < TLBSize; i++) {
+        if (machine->tlb[i].valid && machine->tlb[i].dirty) {
+            pageTable[machine->tlb[i].virtualPage] = machine->tlb[i];
+        }
+    }
+    #endif
 }
 
 //----------------------------------------------------------------------
@@ -177,12 +184,22 @@ void AddrSpace::SaveState() {
 //----------------------------------------------------------------------
 
 void AddrSpace::RestoreState() {
-    machine->pageTable = pageTable;
-    machine->pageTableSize = numPages;
+    #ifdef USE_TLB
+    for (int i = 0; i < TLBSize; i++) {
+        machine->tlb[i].valid = false;
+    }
+    #else
+        machine->pageTable = pageTable;
+        machine->pageTableSize = numPages;
+    #endif
 }
 
 int AddrSpace::Translate(int virtualAddress) {
     int virtualPage = virtualAddress / PageSize;
     int offset = virtualAddress % PageSize;
     return pageTable[virtualPage].physicalPage * PageSize + offset;
+}
+
+TranslationEntry* AddrSpace::GetPage(int virtualPageNumber) {
+    return &pageTable[virtualPageNumber];
 }

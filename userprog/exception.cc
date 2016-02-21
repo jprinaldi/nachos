@@ -30,7 +30,9 @@ void readStrFromUsr(int userAddress, char *outString) {
     int i = 0;
 
     do {
-        machine->ReadMem(userAddress + i, 1, &value);
+        if (!machine->ReadMem(userAddress + i, 1, &value)) {
+            ASSERT(machine->ReadMem(userAddress + i, 1, &value));
+        }
         outString[i++] = value;
     } while (value);
 }
@@ -39,7 +41,9 @@ void readBuffFromUsr(int userAddress, char *outBuffer, int byteCount) {
     int value;
 
     for (int i = 0; i < byteCount; i++) {
-        machine->ReadMem(userAddress + i, 1, &value);
+        if (!machine->ReadMem(userAddress + i, 1, &value)) {
+            ASSERT(machine->ReadMem(userAddress + i, 1, &value));
+        }
         outBuffer[i] = value;
     }
 
@@ -50,16 +54,22 @@ void writeStrToUsr(char *str, int userAddress) {
     int i = 0;
 
     do {
-        machine->WriteMem(userAddress + i, 1, str[i]);
+        if (!machine->WriteMem(userAddress + i, 1, str[i])) {
+            ASSERT(machine->WriteMem(userAddress + i, 1, str[i]));
+        }
     } while (str[i++]);
 }
 
 void writeBuffToUsr(char *str, int userAddress, int byteCount) {
     for (int i = 0; i < byteCount; i++) {
-        machine->WriteMem(userAddress + i, 1, str[i]);
+        if (!machine->WriteMem(userAddress + i, 1, str[i])) {
+            ASSERT(machine->WriteMem(userAddress + i, 1, str[i]));
+        }
     }
 
-    machine->WriteMem(userAddress + byteCount, 1, 0);
+    if (!machine->WriteMem(userAddress + byteCount, 1, 0)) {
+        ASSERT(machine->WriteMem(userAddress + byteCount, 1, 0));
+    }
 }
 
 void IncrementProgramCounter() {
@@ -331,6 +341,32 @@ ExceptionHandler(ExceptionType which) {
                 break;
         }
         IncrementProgramCounter();
+    } else if (which == PageFaultException) {
+        int badVirtualAddress = machine->ReadRegister(BadVAddrReg);
+        int virtualPageNumber = badVirtualAddress / PageSize;
+        int i;
+
+        TranslationEntry* entry =
+            currentThread->space->GetPage(virtualPageNumber);
+
+        for (i = 0; i < TLBSize; i++) {
+            if (!machine->tlb[i].valid) {
+                break;
+            }
+        }
+
+        if (i == TLBSize) {
+            i = rand() % TLBSize;
+        }
+
+        machine->tlb[i].virtualPage = entry->virtualPage;
+        machine->tlb[i].physicalPage = entry->physicalPage;
+        machine->tlb[i].valid = true;
+        machine->tlb[i].use = entry->use;
+        machine->tlb[i].dirty = entry->dirty;
+        machine->tlb[i].readOnly = entry->readOnly;
+    } else if (which == ReadOnlyException) {
+        ASSERT(false);
     } else {
         printf("Unexpected user mode exception %d %d\n", which, type);
         ASSERT(false);
