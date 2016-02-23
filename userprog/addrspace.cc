@@ -18,7 +18,6 @@
 #include "copyright.h"
 #include "system.h"
 #include "addrspace.h"
-#include "noff.h"
 
 //----------------------------------------------------------------------
 // SwapHeader
@@ -56,11 +55,12 @@ SwapHeader(NoffHeader *noffH) {
 //  "executable" is the file containing the object code to load into memory
 //----------------------------------------------------------------------
 
-AddrSpace::AddrSpace(OpenFile *executable) {
-    NoffHeader noffH;
+AddrSpace::AddrSpace(OpenFile *executableInput) {
     unsigned int i, size;
 
-    executable->ReadAt((char *)&noffH, sizeof(noffH), 0);
+    executable = executableInput;
+
+    executable->ReadAt(reinterpret_cast<char *>(&noffH), sizeof(noffH), 0);
     if ((noffH.noffMagic != NOFFMAGIC) &&
         (WordToHost(noffH.noffMagic) == NOFFMAGIC))
         SwapHeader(&noffH);
@@ -82,10 +82,19 @@ AddrSpace::AddrSpace(OpenFile *executable) {
 
     // first, set up the translation
     pageTable = new TranslationEntry[numPages];
+    #ifdef DEMAND_PAGING
+    shadowTable = new pageState[numPages];
+    #endif
     for (i = 0; i < numPages; i++) {
         pageTable[i].virtualPage = i;
+        #ifdef DEMAND_PAGING
+        pageTable[i].physicalPage = -1;
+        pageTable[i].valid = false;
+        shadowTable[i] = kNotInMemory;
+        #else
         pageTable[i].physicalPage = freeList->Find();
         pageTable[i].valid = true;
+        #endif
         pageTable[i].use = false;
         pageTable[i].dirty = false;
         // if the code segment was entirely on
@@ -95,9 +104,13 @@ AddrSpace::AddrSpace(OpenFile *executable) {
 
         // zero out the entire address space,
         // to zero the unitialized data segment and the stack segment
-        bzero(&machine->mainMemory[pageTable[i].physicalPage * PageSize], PageSize);
+        #ifndef DEMAND_PAGING
+        bzero(&machine->mainMemory[pageTable[i].physicalPage * PageSize],
+            PageSize);
+        #endif
     }
 
+    #ifndef DEMAND_PAGING
     // then, copy in the code and data segments into memory
     if (noffH.code.size > 0) {
         DEBUG('a', "Initializing code segment, at 0x%x, size %d\n",
@@ -112,6 +125,7 @@ AddrSpace::AddrSpace(OpenFile *executable) {
         executable->ReadAt(&(machine->mainMemory[Translate(noffH.initData.virtualAddr)]),
             noffH.initData.size, noffH.initData.inFileAddr);
     }
+    #endif
 }
 
 //----------------------------------------------------------------------
@@ -121,9 +135,17 @@ AddrSpace::AddrSpace(OpenFile *executable) {
 
 AddrSpace::~AddrSpace() {
     for (unsigned int i = 0; i < numPages; i++) {
-        freeList->Clear(pageTable[i].physicalPage);
+        if (pageTable[i].valid) {
+            DEBUG('v', "Clearing virtual page number %d from physical page number %d\n",
+                pageTable[i].virtualPage,
+                pageTable[i].physicalPage);
+            freeList->Clear(pageTable[i].physicalPage);
+        }
     }
     delete[] pageTable;
+    #ifdef DEMAND_PAGING
+    delete[] shadowTable;
+    #endif
 }
 
 //----------------------------------------------------------------------
@@ -201,5 +223,42 @@ int AddrSpace::Translate(int virtualAddress) {
 }
 
 TranslationEntry* AddrSpace::GetPage(int virtualPageNumber) {
+    #ifdef DEMAND_PAGING
+    switch (shadowTable[virtualPageNumber]) {
+        case kNotInMemory:
+            LoadPage(virtualPageNumber);
+            break;
+        case kInMemory:
+            break;
+        case kSwapped:
+            break;
+        default:
+            break;
+    }
+    #endif
     return &pageTable[virtualPageNumber];
 }
+
+
+void AddrSpace::LoadPage(int virtualPageNumber) {
+    int virtualAddress = virtualPageNumber * PageSize;
+    pageTable[virtualPageNumber].physicalPage = freeList->Find();
+    pageTable[virtualPageNumber].valid = true;
+    shadowTable[virtualPageNumber] = kInMemory;
+
+    DEBUG('v', "Loading virtual page number %d into physical page number %d\n",
+        virtualPageNumber, pageTable[virtualPageNumber].physicalPage);
+
+    if (noffH.code.size > 0) {
+        executable->ReadAt(&(machine->mainMemory[Translate(virtualAddress)]),
+            PageSize,
+            noffH.code.inFileAddr + virtualAddress - noffH.code.virtualAddr);
+    }
+
+    if (noffH.initData.size > 0) {
+        executable->ReadAt(&(machine->mainMemory[Translate(virtualAddress)]),
+            PageSize,
+            noffH.initData.inFileAddr + virtualAddress - noffH.initData.virtualAddr);
+    }
+}
+

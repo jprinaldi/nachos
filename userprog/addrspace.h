@@ -15,8 +15,15 @@
 
 #include "copyright.h"
 #include "filesys.h"
+#include "noff.h"
 
 #define UserStackSize 1024  // Increase this as necessary!
+
+enum pageState {
+  kNotInMemory,
+  kInMemory,
+  kSwapped
+};
 
 class AddrSpace {
  public:
@@ -35,8 +42,11 @@ class AddrSpace {
     void RestoreState();
 
     int Translate(int virtualAddress);
-    
+
     TranslationEntry* GetPage(int virtualPageNumber);
+
+    // Load page on demand
+    void LoadPage(int virtualPageNumber);
 
  private:
     // Assume linear page table translation for now!
@@ -44,6 +54,12 @@ class AddrSpace {
 
     // Number of pages in the virtual address space
     unsigned int numPages;
+
+    OpenFile* executable;
+    NoffHeader noffH;
+
+    // Table for keeping track of pages state when using demand paging
+    pageState* shadowTable;
 };
 
 #endif  // ADDRSPACE_H
