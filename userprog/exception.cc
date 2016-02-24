@@ -81,6 +81,20 @@ void IncrementProgramCounter() {
 }
 
 void PrepareProcess(void* arg) {
+    char* filename = reinterpret_cast<char*>(arg);
+    OpenFile* executable = fileSystem->Open(reinterpret_cast<char*>(filename));
+    if (executable == NULL) {
+        DEBUG('c', "Could not open file %s\n", filename);
+        machine->WriteRegister(2, -1);
+        delete[] filename;
+        return;
+    }
+    delete[] filename;
+    AddrSpace* addressSpace = new AddrSpace(executable);
+    #ifndef DEMAND_PAGING
+    delete executable;
+    #endif
+    currentThread->space = addressSpace;
     currentThread->space->InitRegisters();
     currentThread->space->RestoreState();
     machine->Run();
@@ -117,7 +131,7 @@ void Halt() {
 void Create() {
     int filenameAddr = machine->ReadRegister(4);
     int fileSize = 0;
-    char* filename = new char[255];
+    char* filename = new char[128];
     readStrFromUsr(filenameAddr, filename);
 
     if (fileSystem->Create(filename, fileSize)) {
@@ -133,7 +147,7 @@ void Read() {
     int bufferAddress = machine->ReadRegister(4);
     int size = machine->ReadRegister(5);
     OpenFileId fileDescriptor = machine->ReadRegister(6);
-    char* buffer = new char[255];
+    char* buffer = new char[128];
     int bytesReadCount;
 
     switch (fileDescriptor) {
@@ -160,7 +174,7 @@ void Write() {
     int bufferAddress = machine->ReadRegister(4);
     int size = machine->ReadRegister(5);
     OpenFileId fileDescriptor = machine->ReadRegister(6);
-    char buffer[1024];
+    char buffer[128];
 
     readBuffFromUsr(bufferAddress, buffer, size);
 
@@ -181,7 +195,7 @@ void Write() {
 
 void Open() {
     int filenameAddress = machine->ReadRegister(4);
-    char* filename = new char[1024];
+    char* filename = new char[128];
     readStrFromUsr(filenameAddress, filename);
     OpenFile* openFile = fileSystem->Open(filename);
     delete[] filename;
@@ -221,21 +235,12 @@ void Join() {
 void Exec() {
     int filenameAddress = machine->ReadRegister(4);
     int argvAddress = machine->ReadRegister(5);
-    char* filename = new char[255];  // size?
-    char* argv = new char[255];
+    char* filename = new char[128];  // size?
+    char* argv = new char[128];
     readStrFromUsr(filenameAddress, filename);
     readStrFromUsr(argvAddress, argv);
 
-    char arg[255];
-
-    OpenFile* file = fileSystem->Open(filename);
-    if (file == NULL) {
-        DEBUG('c', "Could not open file %s\n", filename);
-        machine->WriteRegister(2, -1);
-        delete[] filename;
-        delete[] argv;
-        return;
-    }
+    char arg[128];
 
     Thread* thread = new Thread(filename, true);
     if (thread == NULL) {
@@ -246,18 +251,7 @@ void Exec() {
         return;
     }
 
-    AddrSpace* addressSpace = new AddrSpace(file);
-    if (addressSpace == NULL) {
-        DEBUG('c', "Could not create address space for file %s\n", filename);
-        machine->WriteRegister(2, -1);
-        delete[] filename;
-        delete[] argv;
-        return;
-    }
-
-    thread->space = addressSpace;
-
-    SpaceId pid = processTable->AddProcess(thread);
+    SpaceId pid = processTable->GetPID(thread);
     // TODO: check if process could not be added
 
     int i = 0, k = 0;
@@ -273,9 +267,8 @@ void Exec() {
 
     machine->WriteRegister(2, pid);
 
-    thread->Fork(PrepareProcess, NULL);
+    thread->Fork(PrepareProcess, reinterpret_cast<void*>(filename));
 
-    delete[] filename;
     delete[] argv;
 }
 

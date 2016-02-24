@@ -63,4 +63,9 @@ extern SynchDisk   *synchDisk;
 extern PostOffice* postOffice;
 #endif
 
+#ifdef PAGING
+extern CoreMapEntry* coreMap;
+extern List<int>* loadedPages;
+#endif
+
 #endif  // SYSTEM_H

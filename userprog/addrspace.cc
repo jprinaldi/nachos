@@ -126,6 +126,14 @@ AddrSpace::AddrSpace(OpenFile *executableInput) {
             noffH.initData.size, noffH.initData.inFileAddr);
     }
     #endif
+
+    #ifdef PAGING
+    SpaceId pid = processTable->GetPID(currentThread);
+    swapName = new char[128];
+    snprintf(swapName, 128, "SWAP.%d", pid);
+    fileSystem->Create(swapName, size);
+    swap = fileSystem->Open(swapName);
+    #endif
 }
 
 //----------------------------------------------------------------------
@@ -140,11 +148,22 @@ AddrSpace::~AddrSpace() {
                 pageTable[i].virtualPage,
                 pageTable[i].physicalPage);
             freeList->Clear(pageTable[i].physicalPage);
+            #ifdef PAGING
+            coreMap[pageTable[i].physicalPage].owner = NULL;
+            coreMap[pageTable[i].physicalPage].virtualPage = -1;
+            #endif
         }
     }
     delete[] pageTable;
+
     #ifdef DEMAND_PAGING
     delete[] shadowTable;
+    #endif
+
+    #ifdef PAGING
+    fileSystem->Remove(swapName);
+    delete[] swapName;
+    delete swap;
     #endif
 }
 
@@ -222,32 +241,44 @@ int AddrSpace::Translate(int virtualAddress) {
     return pageTable[virtualPage].physicalPage * PageSize + offset;
 }
 
-TranslationEntry* AddrSpace::GetPage(int virtualPageNumber) {
+TranslationEntry* AddrSpace::GetPage(int virtualPage) {
     #ifdef DEMAND_PAGING
-    switch (shadowTable[virtualPageNumber]) {
+    switch (shadowTable[virtualPage]) {
         case kNotInMemory:
-            LoadPage(virtualPageNumber);
+            LoadPage(virtualPage);
             break;
         case kInMemory:
             break;
-        case kSwapped:
+        #ifdef PAGING
+        case kSwappedOut:
+            SwapIn(virtualPage);
             break;
+        #endif
         default:
             break;
     }
     #endif
-    return &pageTable[virtualPageNumber];
+    return &pageTable[virtualPage];
 }
 
+#ifdef DEMAND_PAGING
+void AddrSpace::LoadPage(int virtualPage) {
+    int virtualAddress = virtualPage * PageSize;
+    pageTable[virtualPage].physicalPage = freeList->Find();
 
-void AddrSpace::LoadPage(int virtualPageNumber) {
-    int virtualAddress = virtualPageNumber * PageSize;
-    pageTable[virtualPageNumber].physicalPage = freeList->Find();
-    pageTable[virtualPageNumber].valid = true;
-    shadowTable[virtualPageNumber] = kInMemory;
+    #ifdef PAGING
+    if (pageTable[virtualPage].physicalPage == -1) {
+        int victimPhysicalPage = MakeRoom();
+        freeList->Mark(victimPhysicalPage);
+        pageTable[virtualPage].physicalPage = victimPhysicalPage;
+    }
+
+    coreMap[pageTable[virtualPage].physicalPage].owner = this;
+    coreMap[pageTable[virtualPage].physicalPage].virtualPage = virtualPage;
+    #endif
 
     DEBUG('v', "Loading virtual page number %d into physical page number %d\n",
-        virtualPageNumber, pageTable[virtualPageNumber].physicalPage);
+        virtualPage, pageTable[virtualPage].physicalPage);
 
     if (noffH.code.size > 0) {
         executable->ReadAt(&(machine->mainMemory[Translate(virtualAddress)]),
@@ -260,5 +291,62 @@ void AddrSpace::LoadPage(int virtualPageNumber) {
             PageSize,
             noffH.initData.inFileAddr + virtualAddress - noffH.initData.virtualAddr);
     }
+
+    pageTable[virtualPage].valid = true;
+    loadedPages->Append(pageTable[virtualPage].physicalPage);
+    shadowTable[virtualPage] = kInMemory;
+}
+#endif
+
+#ifdef PAGING
+void AddrSpace::SwapIn(int virtualPage) {
+    int virtualAddress = virtualPage * PageSize;
+    int physicalPage = freeList->Find();
+    if (physicalPage == -1) {
+        physicalPage = MakeRoom();
+    }
+    int physicalAddress = physicalPage * PageSize;
+    pageTable[virtualPage].physicalPage = physicalPage;
+
+    freeList->Mark(physicalPage);
+
+    coreMap[physicalPage].owner = this;
+    coreMap[physicalPage].virtualPage = virtualPage;
+    pageTable[virtualPage].valid = true;
+
+    swap->ReadAt(&(machine->mainMemory[physicalAddress]), PageSize, virtualAddress);
+    DEBUG('v', "Swapped physical page %d in.\n", physicalPage);
+    loadedPages->Append(physicalPage);
+    shadowTable[virtualPage] = kInMemory;
 }
 
+void AddrSpace::SwapOut(int virtualPage) {
+    int physicalPage = pageTable[virtualPage].physicalPage;
+    int virtualAddress = virtualPage * PageSize;
+    int physicalAddress = physicalPage * PageSize;
+
+    swap->WriteAt(&(machine->mainMemory[physicalAddress]), PageSize, virtualAddress);
+    DEBUG('v', "Swapped physical page %d out.\n", physicalPage);
+    freeList->Clear(physicalPage);
+    pageTable[virtualPage].valid = false;
+    pageTable[virtualPage].physicalPage = -1;
+    coreMap[physicalPage].owner = NULL;
+    coreMap[physicalPage].virtualPage = -1; // not really necessary I believe
+    for (int i = 0; i < TLBSize; i++) {
+        if (machine->tlb[i].physicalPage == physicalPage) {
+            machine->tlb[i].valid = false;
+            break;
+        }
+    }
+
+    shadowTable[virtualPage] = kSwappedOut;
+}
+
+int AddrSpace::MakeRoom() {
+    int victimPhysicalPage = loadedPages->Remove();
+    int victimVirtualPage = coreMap[victimPhysicalPage].virtualPage;
+    coreMap[victimPhysicalPage].owner->SwapOut(victimVirtualPage);
+    return victimPhysicalPage;
+}
+
+#endif
