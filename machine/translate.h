@@ -42,4 +42,13 @@ class TranslationEntry {
       // page is modified.
 };
 
+#ifdef PAGING
+class AddrSpace;
+class CoreMapEntry {
+ public:
+    AddrSpace* owner;
+    int virtualPage;
+};
+#endif
+
 #endif

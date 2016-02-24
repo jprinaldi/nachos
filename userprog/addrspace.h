@@ -20,9 +20,9 @@
 #define UserStackSize 1024  // Increase this as necessary!
 
 enum pageState {
-  kNotInMemory,
-  kInMemory,
-  kSwapped
+    kNotInMemory,
+    kInMemory,
+    kSwappedOut
 };
 
 class AddrSpace {
@@ -45,8 +45,15 @@ class AddrSpace {
 
     TranslationEntry* GetPage(int virtualPageNumber);
 
-    // Load page on demand
+    #ifdef DEMAND_PAGING
     void LoadPage(int virtualPageNumber);
+    #endif
+
+    #ifdef PAGING
+    void SwapIn(int virtualPage);
+    void SwapOut(int virtualPage);
+    int MakeRoom();
+    #endif
 
  private:
     // Assume linear page table translation for now!
@@ -58,8 +65,15 @@ class AddrSpace {
     OpenFile* executable;
     NoffHeader noffH;
 
+    #ifdef DEMAND_PAGING
     // Table for keeping track of pages state when using demand paging
     pageState* shadowTable;
+    #endif
+
+    #ifdef PAGING
+    char* swapName;
+    OpenFile* swap;
+    #endif
 };
 
 #endif  // ADDRSPACE_H
