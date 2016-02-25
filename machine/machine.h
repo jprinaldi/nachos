@@ -26,6 +26,24 @@
 #include "translate.h"
 #include "disk.h"
 
+#ifdef CLOCK_ALGORITHM
+#ifndef PAGING
+#define PAGING
+#endif
+#endif
+
+#ifdef PAGING
+#ifndef DEMAND_PAGING
+#define DEMAND_PAGING
+#endif
+#endif
+
+#ifdef DEMAND_PAGING
+#ifndef USE_TLB
+#define USE_TLB
+#endif
+#endif
+
 // Definitions related to the size, and format of user memory
 
 const int PageSize = SectorSize;    // set the page size equal to
