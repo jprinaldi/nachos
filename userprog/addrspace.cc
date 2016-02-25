@@ -75,7 +75,9 @@ AddrSpace::AddrSpace(OpenFile *executableInput) {
 
     // check we're not trying to run anything too big --
     // at least until we have virtual memory
-    // ASSERT(numPages <= NumPhysPages);
+    #ifndef USE_TLB
+    ASSERT(numPages <= NumPhysPages);
+    #endif
 
     DEBUG('a', "Initializing address space, num pages %d, size %d\n",
         numPages, size);
@@ -314,7 +316,8 @@ void AddrSpace::SwapIn(int virtualPage) {
     coreMap[physicalPage].virtualPage = virtualPage;
     pageTable[virtualPage].valid = true;
 
-    swap->ReadAt(&(machine->mainMemory[physicalAddress]), PageSize, virtualAddress);
+    swap->ReadAt(&(machine->mainMemory[physicalAddress]),
+        PageSize, virtualAddress);
     DEBUG('v', "Swapped physical page %d in.\n", physicalPage);
     loadedPages->Append(physicalPage);
     shadowTable[virtualPage] = kInMemory;
@@ -325,13 +328,14 @@ void AddrSpace::SwapOut(int virtualPage) {
     int virtualAddress = virtualPage * PageSize;
     int physicalAddress = physicalPage * PageSize;
 
-    swap->WriteAt(&(machine->mainMemory[physicalAddress]), PageSize, virtualAddress);
+    swap->WriteAt(&(machine->mainMemory[physicalAddress]),
+        PageSize, virtualAddress);
     DEBUG('v', "Swapped physical page %d out.\n", physicalPage);
     freeList->Clear(physicalPage);
     pageTable[virtualPage].valid = false;
     pageTable[virtualPage].physicalPage = -1;
     coreMap[physicalPage].owner = NULL;
-    coreMap[physicalPage].virtualPage = -1; // not really necessary I believe
+    coreMap[physicalPage].virtualPage = -1;
     for (int i = 0; i < TLBSize; i++) {
         if (machine->tlb[i].physicalPage == physicalPage) {
             machine->tlb[i].valid = false;
@@ -343,10 +347,40 @@ void AddrSpace::SwapOut(int virtualPage) {
 }
 
 int AddrSpace::MakeRoom() {
+    #ifdef CLOCK_ALGORITHM
+    int victimPhysicalPage = Clock();
+    #else
     int victimPhysicalPage = loadedPages->Remove();
+    #endif
     int victimVirtualPage = coreMap[victimPhysicalPage].virtualPage;
     coreMap[victimPhysicalPage].owner->SwapOut(victimVirtualPage);
     return victimPhysicalPage;
+}
+
+struct loadedPageState {
+    int use, dirty;
+    loadedPageState(int useVal, int dirtyVal) {
+        use = useVal;
+        dirty = dirtyVal;
+    }
+};
+
+int AddrSpace::Clock() {
+    int candidatePage;
+    TranslationEntry candidatePageInfo;
+    loadedPageState loadedPageStates[4] = {{0, 0}, {0, 1}, {1, 0}, {1, 1}};
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < NumPhysPages; j++) {
+            candidatePage = loadedPages->Remove();
+            candidatePageInfo = pageTable[candidatePage];
+            if (candidatePageInfo.use == loadedPageStates[i].use &&
+                candidatePageInfo.dirty == loadedPageStates[i]. dirty) {
+                    return candidatePage;
+                }
+            loadedPages->Prepend(candidatePage);
+        }
+    }
+    return -1;
 }
 
 #endif

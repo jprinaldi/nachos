@@ -53,6 +53,7 @@ class AddrSpace {
     void SwapIn(int virtualPage);
     void SwapOut(int virtualPage);
     int MakeRoom();
+    int Clock();
     #endif
 
  private:

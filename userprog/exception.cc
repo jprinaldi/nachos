@@ -252,7 +252,6 @@ void Exec() {
     }
 
     SpaceId pid = processTable->GetPID(thread);
-    // TODO: check if process could not be added
 
     int i = 0, k = 0;
     do {
